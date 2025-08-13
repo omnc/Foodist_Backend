@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -14,7 +13,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum MealTypes{
+enum MealTypes {
   BREAKFAST
   LUNCH
   DINNER
@@ -25,30 +24,31 @@ enum MealTypes{
   BREAD
 }
 
-model User{
-  id Int @id @default(autoincrement())
-  email String @unique
+model User {
+  id       Int      @id @default(autoincrement())
+  email    String   @unique
   password String
-  recipes Recipe[]
+  recipes  Recipe[]
 }
 
-model IngredientBlock{
-  id Int @id @default(autoincrement())
-  title String
-  items String[]
-  Recipe Recipe[]
+model IngredientBlock {
+  id      Int      @id @default(autoincrement())
+  title   String
+  items   String[]
+  recipes Recipe[] @relation("IngredientBlockToRecipe")
 }
 
-model Recipe{
-  id Int @id @default(autoincrement())
-  user User[]
-  title String
-  description String
-  mealtype MealTypes
-  servingSize Int
-  level Int
-  prepTime Int
-  cookTime Int
-  ingredientBlock IngredientBlock @relation(fields: [ingredientBlockID], references: [id])
+model Recipe {
+  id                Int             @id @default(autoincrement())
+  user              User            @relation(fields: [userID], references: [id])
+  userID            Int
+  title             String
+  description       String
+  mealtype          MealTypes
+  servingSize       Int
+  level             Int
+  prepTime          Int
+  cookTime          Int
+  ingredientBlock   IngredientBlock @relation("IngredientBlockToRecipe", fields: [ingredientBlockID], references: [id])
   ingredientBlockID Int
 }
