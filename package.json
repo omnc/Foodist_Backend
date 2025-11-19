@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "build": "prisma generate",
+    "predeploy": "npm run build"
   },
   "dependencies": {
     "hono": "^4.10.6"
