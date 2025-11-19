@@ -37,15 +37,15 @@ model User {
 model IngredientBlock {
   id      Int      @id @default(autoincrement())
   title   String
-  items   String[]
+  items   IngredientBlockItem[]
   recipes Recipe[] @relation("IngredientBlockToRecipe")
 }
 
 model IngredientBlockItem {
-  id Int @id @default(autoincrement)
+  id Int @id @default(autoincrement())
   value String
   measurement String
-  ingredientBlock IngredientBlock @relation(field: [ingredientBlockID], references: [id])
+  ingredientBlock IngredientBlock @relation(fields: [ingredientBlockID], references: [id])
   ingredientBlockID Int
 }
 
