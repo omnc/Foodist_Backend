@@ -10,6 +10,13 @@
 			"database_id": "bfb20027-ddbb-4c51-9f6f-a57457b87b29",
 			"remote": true
 		}
+	],
+	"r2_buckets": [
+		{
+			"bucket_name": "foodist-images",
+			"binding": "IMAGES",
+			"remote": true
+		}
 	]
 	// "compatibility_flags": [
 	//   "nodejs_compat"

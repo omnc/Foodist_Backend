@@ -29,7 +29,20 @@ model User {
   id       Int      @id @default(autoincrement())
   email    String   @unique
   password String
-  recipes  Recipe[]
+  recipes  Recipe[] @relation("UserRecipes")
+  comments Comment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userID], references: [id])
+  userID    Int
+  recipe    Recipe   @relation(fields: [recipeID], references: [id])
+  recipeID  Int
+  body      String
+  rating    Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -50,8 +63,8 @@ model IngredientBlockItem {
 }
 
 model Recipe {
-  id                Int             @id @default(autoincrement())
-  user              User            @relation(fields: [userID], references: [id])
+  id                Int                @id @default(autoincrement())
+  user              User               @relation("UserRecipes", fields: [userID], references: [id])
   userID            Int
   title             String
   description       String
@@ -60,7 +73,7 @@ model Recipe {
   level             Int
   prepTime          Int
   cookTime          Int
-  ingredientBlock   IngredientBlock @relation("IngredientBlockToRecipe", fields: [ingredientBlockID], references: [id])
+  ingredientBlock   IngredientBlock    @relation("IngredientBlockToRecipe", fields: [ingredientBlockID], references: [id])
   ingredientBlockID Int
   // Legacy field kept for backward compatibility
   imageUrl          String?
@@ -68,8 +81,9 @@ model Recipe {
   titleImage        String?
   // Multiple description blocks per recipe
   descriptionBlocks DescriptionBlock[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  comments          Comment[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model DescriptionBlock {
