@@ -29,6 +29,9 @@ model User {
   id       Int      @id @default(autoincrement())
   email    String   @unique
   password String
+  username String?
+  pfpUrl   String?
+  bio      String?
   recipes  Recipe[] @relation("UserRecipes")
   comments Comment[]
   createdAt DateTime @default(now())
@@ -75,11 +78,7 @@ model Recipe {
   cookTime          Int
   ingredientBlock   IngredientBlock    @relation("IngredientBlockToRecipe", fields: [ingredientBlockID], references: [id])
   ingredientBlockID Int
-  // Legacy field kept for backward compatibility
-  imageUrl          String?
-  // New title image for the recipe
   titleImage        String?
-  // Multiple description blocks per recipe
   descriptionBlocks DescriptionBlock[]
   comments          Comment[]
   createdAt         DateTime           @default(now())
