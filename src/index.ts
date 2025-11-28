@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { trimTrailingSlash } from 'hono/trailing-slash'
 import authController from './controllers/authController'
 import recipeController from './controllers/recipeController'
 
@@ -10,6 +11,9 @@ type Bindings = {
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
+
+// Remove trailing slashes
+app.use('*', trimTrailingSlash())
 
 // CORS middleware
 app.use('*', cors({
