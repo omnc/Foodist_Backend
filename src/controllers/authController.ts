@@ -69,6 +69,51 @@ authController.post('/login', async (c) => {
     });
 })
 
+//get current authenticated user - check if signed in
+authController.get('/me', authMiddleware, async (c) => {
+    const authenticatedUser = c.get('user');
+    
+    if (!authenticatedUser) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    const prisma = await prismaClients.fetch(c.env.FOODIST);
+    const user = await prisma.user.findUnique({
+        where: { id: authenticatedUser.id },
+        select: {
+            id: true,
+            email: true,
+            username: true,
+            pfpUrl: true,
+            bio: true,
+            createdAt: true,
+            updatedAt: true
+            // Don't send password!
+        }
+    });
+    
+    if (!user) {
+        return c.json({ error: 'User not found' }, 404);
+    }
+    
+    return c.json(user);
+})
+
+//get a user by ID (authenticated)
+authController.get('/:id', authMiddleware, async (c) => {
+    const prisma = await prismaClients.fetch(c.env.FOODIST);
+    const authenticatedUser = c.get('user');
+    if (!authenticatedUser) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const { id } = c.req.param();
+    const user = await prisma.user.findUnique({
+        where: { id: parseInt(id) },
+    });
+    return c.json(user);
+})
+
+//update a user(authenticated)
 authController.put('/:id', authMiddleware, async (c) => {
     const prisma = await prismaClients.fetch(c.env.FOODIST);
     const user = c.get('user');
