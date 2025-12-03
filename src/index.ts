@@ -17,9 +17,17 @@ app.use('*', trimTrailingSlash())
 
 // CORS middleware
 app.use('*', cors({
-  origin: '*', // In production, replace with your frontend domain
-  allowHeaders: ['Content-Type', 'Authorization'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  origin: [
+    'https://foodist-frontend.pages.dev',
+    'http://localhost:3000',
+    'http://localhost:5173', // Vite default
+    '*' // Allow all origins during development
+  ],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  credentials: true,
+  exposeHeaders: ['Content-Length', 'X-Request-Id'],
+  maxAge: 86400, // 24 hours
 }))
 
 // Global error handler
