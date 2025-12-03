@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { trimTrailingSlash } from 'hono/trailing-slash'
 import authController from './controllers/authController'
 import recipeController from './controllers/recipeController'
+import savedRecipeController from './controllers/savedRecipeController'
 
 type Bindings = {
   FOODIST: D1Database
@@ -54,6 +55,7 @@ app.get('/', (c) => {
 // Mount controllers
 app.route('/auth', authController)
 app.route('/recipes', recipeController)
+app.route('/saved-recipes', savedRecipeController)
 
 // 404 handler
 app.notFound((c) => {

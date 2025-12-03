@@ -26,16 +26,17 @@ enum MealTypes {
 }
 
 model User {
-  id       Int      @id @default(autoincrement())
-  email    String   @unique
-  password String
-  username String?
-  pfpUrl   String?
-  bio      String?
-  recipes  Recipe[] @relation("UserRecipes")
-  comments Comment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  password     String
+  username     String?
+  pfpUrl       String?
+  bio          String?
+  recipes      Recipe[]      @relation("UserRecipes")
+  comments     Comment[]
+  savedRecipes SavedRecipe[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model Comment {
@@ -81,16 +82,29 @@ model Recipe {
   titleImage        String?
   descriptionBlocks DescriptionBlock[]
   comments          Comment[]
+  savedBy           SavedRecipe[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 }
 
 model DescriptionBlock {
-  id          Int     @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   description String
   imageUrl    String?
-  recipe      Recipe  @relation(fields: [recipeId], references: [id])
+  recipe      Recipe   @relation(fields: [recipeId], references: [id])
   recipeId    Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model SavedRecipe {
+  id       Int      @id @default(autoincrement())
+  user     User     @relation(fields: [userID], references: [id])
+  userID   Int
+  recipe   Recipe   @relation(fields: [recipeID], references: [id])
+  recipeID Int
+  savedAt  DateTime @default(now())
+  note     String?
+  
+  @@unique([userID, recipeID])
 }
