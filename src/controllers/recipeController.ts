@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { uploadImage } from "../lib/imageUpload";
 import prismaClients from "../lib/prismaClient";
+import { MealTypes } from "../generated/prisma";
 
 type Bindings = {
     FOODIST: D1Database;
@@ -174,7 +175,7 @@ recipeController.delete('/comments/:id', authMiddleware, async (c) => {
 recipeController.get('/search', async (c) => {
     const prisma = await prismaClients.fetch(c.env.FOODIST);
     const query = c.req.query('q');
-    const mealtype = c.req.query('mealtype');
+    const mealtype = c.req.query('mealtype') as MealTypes | undefined;
     const level = c.req.query('level');
     
     const recipes = await prisma.recipe.findMany({
@@ -185,7 +186,7 @@ recipeController.get('/search', async (c) => {
                     { description: { contains: query } }
                 ]
             }),
-            ...(mealtype && { mealtype: mealtype }),
+            ...(mealtype && { mealtype: mealtype as MealTypes }),
             ...(level && { level: parseInt(level) })
         }
     });
@@ -208,7 +209,7 @@ recipeController.post('/', authMiddleware, async (c) => {
     // Extract text fields
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
-    const mealtype = formData.get('mealtype') as string;
+    const mealtype = formData.get('mealtype') as MealTypes;
     const servingSize = parseInt(formData.get('servingSize') as string);
     const level = parseInt(formData.get('level') as string);
     const prepTime = parseInt(formData.get('prepTime') as string);
@@ -282,7 +283,7 @@ recipeController.put('/:id', authMiddleware, async (c) => {
     // Extract fields
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
-    const mealtype = formData.get('mealtype') as string;
+    const mealtype = formData.get('mealtype') as MealTypes;
     const servingSize = parseInt(formData.get('servingSize') as string);
     const level = parseInt(formData.get('level') as string);
     const prepTime = parseInt(formData.get('prepTime') as string);
