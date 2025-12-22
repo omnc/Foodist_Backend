@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "foodist_backend",
+	"name": "foodist-backend",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-11-19",
 	"d1_databases": [
