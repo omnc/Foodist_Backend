@@ -209,12 +209,61 @@ recipeController.post('/', authMiddleware, async (c) => {
     // Extract text fields
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
-    const mealtype = formData.get('mealtype') as MealTypes;
-    const servingSize = parseInt(formData.get('servingSize') as string);
-    const level = parseInt(formData.get('level') as string);
-    const prepTime = parseInt(formData.get('prepTime') as string);
-    const cookTime = parseInt(formData.get('cookTime') as string);
-    const ingredientBlockID = parseInt(formData.get('ingredientBlockID') as string);
+    const mealtypeRaw = formData.get('mealtype') as string | null;
+    const servingSizeRaw = formData.get('servingSize') as string | null;
+    const levelRaw = formData.get('level') as string | null;
+    const prepTimeRaw = formData.get('prepTime') as string | null;
+    const cookTimeRaw = formData.get('cookTime') as string | null;
+    const ingredientBlockIDRaw = formData.get('ingredientBlockID') as string | null;
+    
+    // Validate required fields
+    if (!title) {
+        return c.json({ error: 'title is required' }, 400);
+    }
+    if (!description) {
+        return c.json({ error: 'description is required' }, 400);
+    }
+    if (!mealtypeRaw) {
+        return c.json({ error: 'mealtype is required' }, 400);
+    }
+    
+    // Validate mealtype is valid enum value
+    const validMealTypes = ['BREAKFAST', 'LUNCH', 'DINNER', 'SIDEDISH', 'APPETIZER', 'DESSERT', 'DRINK', 'BREAD'];
+    if (!validMealTypes.includes(mealtypeRaw)) {
+        return c.json({ 
+            error: `Invalid mealtype. Must be one of: ${validMealTypes.join(', ')}` 
+        }, 400);
+    }
+    const mealtype = mealtypeRaw as MealTypes;
+    
+    // Parse numbers with defaults
+    const servingSize = servingSizeRaw ? parseInt(servingSizeRaw) : 1;
+    const level = levelRaw ? parseInt(levelRaw) : 1;
+    const prepTime = prepTimeRaw ? parseInt(prepTimeRaw) : 0;
+    const cookTime = cookTimeRaw ? parseInt(cookTimeRaw) : 0;
+    
+    // ingredientBlockID is optional - if not provided, we'll need to create one or make it optional
+    let ingredientBlockID: number | undefined;
+    if (ingredientBlockIDRaw) {
+        ingredientBlockID = parseInt(ingredientBlockIDRaw);
+        if (isNaN(ingredientBlockID)) {
+            return c.json({ error: 'ingredientBlockID must be a valid number' }, 400);
+        }
+        
+        // Verify ingredientBlock exists
+        const ingredientBlock = await prisma.ingredientBlock.findUnique({
+            where: { id: ingredientBlockID }
+        });
+        if (!ingredientBlock) {
+            return c.json({ error: 'IngredientBlock not found' }, 404);
+        }
+    } else {
+        // Create a default ingredient block if none provided
+        const newIngredientBlock = await prisma.ingredientBlock.create({
+            data: { title: 'Ingredients' }
+        });
+        ingredientBlockID = newIngredientBlock.id;
+    }
     
     // Handle title image upload
     const titleImageFile = formData.get('titleImage') as File | null;
@@ -234,7 +283,7 @@ recipeController.post('/', authMiddleware, async (c) => {
         titleImageUrl = await uploadImage(titleImageFile, c.env.IMAGES, 'recipes');
     }
     
-    // Create recipe with image URL
+    // Create recipe
     const recipe = await prisma.recipe.create({
         data: {
             title,
@@ -244,7 +293,7 @@ recipeController.post('/', authMiddleware, async (c) => {
             level,
             prepTime,
             cookTime,
-            ingredientBlockID,
+            ingredientBlockID: ingredientBlockID!,
             titleImage: titleImageUrl,
             userID: user.id
         }
