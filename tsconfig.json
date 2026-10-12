@@ -5,10 +5,15 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "lib": [
       "ESNext"
     ],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
   },
+  "exclude": [
+    "node_modules",
+    "src/**/*.test.ts"
+  ]
 }

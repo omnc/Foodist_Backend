@@ -5,8 +5,11 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  // Prisma 6.19 + @prisma/adapter-d1@6.19 (pinned together).
+  // driverAdapters preview flag is deprecated in 6.19 and unnecessary.
+  // Prisma 7 upgrade deferred: requires generator/runtime changes and has
+  // known D1 savepoint gaps — see README.
+  provider = "prisma-client-js"
 }
 
 datasource db {
