@@ -18,11 +18,11 @@ app.use('*', trimTrailingSlash())
 
 // CORS middleware
 app.use('*', cors({
+  // Explicit allowlist only — do not use '*' with credentials
   origin: [
     'https://foodist-frontend.pages.dev',
     'http://localhost:3000',
-    'http://localhost:5173', // Vite default
-    '*' // Allow all origins during development
+    'http://localhost:5173',
   ],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -31,12 +31,11 @@ app.use('*', cors({
   maxAge: 86400, // 24 hours
 }))
 
-// Global error handler
+// Global error handler — do not leak internal exception details to clients
 app.onError((err, c) => {
   console.error('Error:', err)
-  return c.json({ 
+  return c.json({
     error: 'Internal Server Error',
-    message: err.message 
   }, 500)
 })
 
