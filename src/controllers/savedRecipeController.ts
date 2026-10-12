@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import prismaClients from "../lib/prismaClient";
+import { getAuthUserId, type AuthUser } from "../lib/authz";
 
 type Bindings = {
     FOODIST: D1Database;
@@ -8,22 +9,22 @@ type Bindings = {
 }
 
 type Variables = {
-    user: any;
+    user: AuthUser;
 }
 
 const savedRecipeController = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // Get all saved recipes for current user
 savedRecipeController.get('/', authMiddleware, async (c) => {
-    const user = c.get('user');
+    const userId = getAuthUserId(c.get('user'));
     
-    if (!user) {
+    if (!userId) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
     
     const prisma = await prismaClients.fetch(c.env.FOODIST);
     const savedRecipes = await prisma.savedRecipe.findMany({
-        where: { userID: user.id },
+        where: { userID: userId },
         include: {
             recipe: {
                 include: {
@@ -41,9 +42,9 @@ savedRecipeController.get('/', authMiddleware, async (c) => {
 
 // Save a recipe
 savedRecipeController.post('/:recipeId', authMiddleware, async (c) => {
-    const user = c.get('user');
+    const userId = getAuthUserId(c.get('user'));
     
-    if (!user) {
+    if (!userId) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
     
@@ -63,7 +64,7 @@ savedRecipeController.post('/:recipeId', authMiddleware, async (c) => {
     // Check if already saved
     const existing = await prisma.savedRecipe.findFirst({
         where: {
-            userID: user.id,
+            userID: userId,
             recipeID
         }
     });
@@ -75,7 +76,7 @@ savedRecipeController.post('/:recipeId', authMiddleware, async (c) => {
     // Save recipe
     const savedRecipe = await prisma.savedRecipe.create({
         data: {
-            userID: user.id,
+            userID: userId,
             recipeID,
             note
         },
@@ -89,9 +90,9 @@ savedRecipeController.post('/:recipeId', authMiddleware, async (c) => {
 
 // Update note on saved recipe
 savedRecipeController.put('/:recipeId', authMiddleware, async (c) => {
-    const user = c.get('user');
+    const userId = getAuthUserId(c.get('user'));
     
-    if (!user) {
+    if (!userId) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
     
@@ -102,7 +103,7 @@ savedRecipeController.put('/:recipeId', authMiddleware, async (c) => {
     // Find saved recipe
     const savedRecipe = await prisma.savedRecipe.findFirst({
         where: {
-            userID: user.id,
+            userID: userId,
             recipeID
         }
     });
@@ -122,9 +123,9 @@ savedRecipeController.put('/:recipeId', authMiddleware, async (c) => {
 
 // Unsave a recipe (delete)
 savedRecipeController.delete('/:recipeId', authMiddleware, async (c) => {
-    const user = c.get('user');
+    const userId = getAuthUserId(c.get('user'));
     
-    if (!user) {
+    if (!userId) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
     
@@ -134,7 +135,7 @@ savedRecipeController.delete('/:recipeId', authMiddleware, async (c) => {
     // Find saved recipe
     const savedRecipe = await prisma.savedRecipe.findFirst({
         where: {
-            userID: user.id,
+            userID: userId,
             recipeID
         }
     });
@@ -153,9 +154,9 @@ savedRecipeController.delete('/:recipeId', authMiddleware, async (c) => {
 
 // Check if a recipe is saved by current user
 savedRecipeController.get('/check/:recipeId', authMiddleware, async (c) => {
-    const user = c.get('user');
+    const userId = getAuthUserId(c.get('user'));
     
-    if (!user) {
+    if (!userId) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
     
@@ -164,7 +165,7 @@ savedRecipeController.get('/check/:recipeId', authMiddleware, async (c) => {
     
     const savedRecipe = await prisma.savedRecipe.findFirst({
         where: {
-            userID: user.id,
+            userID: userId,
             recipeID
         }
     });

@@ -3,6 +3,8 @@ import prismaClients from "../lib/prismaClient";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { sign } from 'hono/jwt';
 import bcrypt from 'bcryptjs';
+import { publicUserSelect, toPublicUser } from "../lib/userDto";
+import { getAuthUserId, requireSelf, type AuthUser } from "../lib/authz";
 
 type Bindings = {
   FOODIST: D1Database;
@@ -10,156 +12,235 @@ type Bindings = {
 }
 
 type Variables = {
-  user: any;
+  user: AuthUser;
 }
 
 const authController = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-
 authController.post('/register', async (c) => {
     const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const { email, password } = await c.req.json();
+    const body = await c.req.json().catch(() => null);
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body?.password === 'string' ? body.password : '';
+
+    if (!email || !password) {
+        return c.json({ error: 'Email and password are required' }, 400);
+    }
+    if (password.length < 8) {
+        return c.json({ error: 'Password must be at least 8 characters' }, 400);
+    }
+
     const existingUser = await prisma.user.findUnique({
         where: { email },
     });
     if (existingUser) {
         return c.json({ error: 'User already exists' }, 400);
     }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
         data: { email, password: hashedPassword },
+        select: publicUserSelect,
     });
-    return c.json(user);
+    return c.json(user, 201);
 })
 
 authController.post('/login', async (c) => {
     const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const { email, password } = await c.req.json();
-    
+    const body = await c.req.json().catch(() => null);
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body?.password === 'string' ? body.password : '';
+
+    if (!email || !password) {
+        return c.json({ error: 'Email and password are required' }, 400);
+    }
+
     const user = await prisma.user.findUnique({
         where: { email },
     });
-    
+
+    // Uniform message to avoid account enumeration
     if (!user) {
-        return c.json({ error: 'User not found' }, 404);
+        return c.json({ error: 'Invalid email or password' }, 401);
     }
-    
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-        return c.json({ error: 'Invalid password' }, 401);
+        return c.json({ error: 'Invalid email or password' }, 401);
     }
-    
-    // Generate JWT token
+
     const token = await sign(
-        { 
-            id: user.id, 
+        {
+            id: user.id,
             email: user.email,
             exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
         },
         c.env.JWT_SECRET
     );
-    
-    return c.json({ 
+
+    return c.json({
         message: 'Login successful',
         token,
-        user: {
-            id: user.id,
-            email: user.email
-        }
+        user: toPublicUser(user as unknown as Record<string, unknown>),
     });
 })
 
 //get current authenticated user - check if signed in
 authController.get('/me', authMiddleware, async (c) => {
     const authenticatedUser = c.get('user');
-    
-    if (!authenticatedUser) {
+    const userId = getAuthUserId(authenticatedUser);
+
+    if (!userId) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
-    
+
     const prisma = await prismaClients.fetch(c.env.FOODIST);
     const user = await prisma.user.findUnique({
-        where: { id: authenticatedUser.id },
-        select: {
-            id: true,
-            email: true,
-            username: true,
-            pfpUrl: true,
-            bio: true,
-            createdAt: true,
-            updatedAt: true
-            // Don't send password!
-        }
+        where: { id: userId },
+        select: publicUserSelect,
     });
-    
+
     if (!user) {
         return c.json({ error: 'User not found' }, 404);
     }
-    
+
     return c.json(user);
 })
 
-//get a user by ID (authenticated)
-authController.get('/:id', authMiddleware, async (c) => {
+/**
+ * In-session password change.
+ * Requires authenticated session + current password.
+ * Identity is taken from JWT — email in the body is ignored for authorization.
+ * Unauthenticated email-only password changes are not supported (no reset-token flow yet).
+ */
+authController.post('/change-password', authMiddleware, async (c) => {
     const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const authenticatedUser = c.get('user');
-    if (!authenticatedUser) {
-        return c.json({ error: 'Unauthorized' }, 401);
-    }
-    const { id } = c.req.param();
-    const user = await prisma.user.findUnique({
-        where: { id: parseInt(id) },
-    });
-    return c.json(user);
-})
+    const authUser = c.get('user');
+    const userId = getAuthUserId(authUser);
 
-//update a user(authenticated)
-authController.put('/:id', authMiddleware, async (c) => {
-    const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const user = c.get('user');
-    if (!user) {
+    if (!userId) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
-    const { id } = c.req.param();
-    const { email, password } = await c.req.json();
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const updatedUser = await prisma.user.update({
-        where: { id: parseInt(id) },
-        data: { email, password: hashedPassword },
-    });
-    return c.json(updatedUser);
-})
-    
-//delete a user(authenticated)
-authController.delete('/:id', authMiddleware, async (c) => {
-    const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const user = c.get('user');
-    if (!user) {
-        return c.json({ error: 'Unauthorized' }, 401);
-    }
-    const { id } = c.req.param();
-    const deletedUser = await prisma.user.delete({
-        where: { id: parseInt(id) },
-    });
-    return c.json(deletedUser);
-})
 
-//change the password- not authenticated
-authController.post('/change-password', async (c) => {
-    const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const { email, password } = await c.req.json();
-    const user = await prisma.user.findUnique({
-        where: { email },
-    });
+    const body = await c.req.json().catch(() => null);
+    const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : '';
+    const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : '';
+
+    if (!currentPassword || !newPassword) {
+        return c.json({ error: 'currentPassword and newPassword are required' }, 400);
+    }
+    if (newPassword.length < 8) {
+        return c.json({ error: 'New password must be at least 8 characters' }, 400);
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
         return c.json({ error: 'User not found' }, 404);
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const updatedUser = await prisma.user.update({
-        where: { id: user.id },
+
+    const currentOk = await bcrypt.compare(currentPassword, user.password);
+    if (!currentOk) {
+        return c.json({ error: 'Current password is incorrect' }, 401);
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+        where: { id: userId },
         data: { password: hashedPassword },
     });
-    return c.json(updatedUser);
+
+    return c.json({ message: 'Password updated successfully' });
+})
+
+// Public-ish profile by ID (authenticated): never returns password hash
+authController.get('/:id', authMiddleware, async (c) => {
+    const authenticatedUser = c.get('user');
+    if (!getAuthUserId(authenticatedUser)) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const id = parseInt(c.req.param('id'), 10);
+    if (!Number.isInteger(id) || id <= 0) {
+        return c.json({ error: 'Invalid user id' }, 400);
+    }
+
+    const prisma = await prismaClients.fetch(c.env.FOODIST);
+    const user = await prisma.user.findUnique({
+        where: { id },
+        select: publicUserSelect,
+    });
+
+    if (!user) {
+        return c.json({ error: 'User not found' }, 404);
+    }
+
+    return c.json(user);
+})
+
+// Self-service profile update only (identity from JWT, not trusted path id alone)
+authController.put('/:id', authMiddleware, async (c) => {
+    const prisma = await prismaClients.fetch(c.env.FOODIST);
+    const authUser = c.get('user');
+    const gate = requireSelf(authUser, c.req.param('id'));
+    if (!gate.ok) {
+        return c.json({ error: gate.error }, gate.status);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+        return c.json({ error: 'Invalid request body' }, 400);
+    }
+
+    // Password changes must use POST /auth/change-password (requires current password)
+    if ('password' in body || 'newPassword' in body) {
+        return c.json({
+            error: 'Use POST /auth/change-password to update password',
+        }, 400);
+    }
+
+    const data: { email?: string; username?: string | null; bio?: string | null; pfpUrl?: string | null } = {};
+    if (typeof body.email === 'string' && body.email.trim()) {
+        data.email = body.email.trim().toLowerCase();
+    }
+    if ('username' in body) {
+        data.username = body.username === null ? null : String(body.username);
+    }
+    if ('bio' in body) {
+        data.bio = body.bio === null ? null : String(body.bio);
+    }
+    if ('pfpUrl' in body) {
+        data.pfpUrl = body.pfpUrl === null ? null : String(body.pfpUrl);
+    }
+
+    if (Object.keys(data).length === 0) {
+        return c.json({ error: 'No updatable fields provided' }, 400);
+    }
+
+    try {
+        const updatedUser = await prisma.user.update({
+            where: { id: gate.userId },
+            data,
+            select: publicUserSelect,
+        });
+        return c.json(updatedUser);
+    } catch {
+        return c.json({ error: 'Unable to update user' }, 400);
+    }
+})
+
+// Self-service delete only
+authController.delete('/:id', authMiddleware, async (c) => {
+    const prisma = await prismaClients.fetch(c.env.FOODIST);
+    const authUser = c.get('user');
+    const gate = requireSelf(authUser, c.req.param('id'));
+    if (!gate.ok) {
+        return c.json({ error: gate.error }, gate.status);
+    }
+
+    await prisma.user.delete({
+        where: { id: gate.userId },
+    });
+    return c.json({ message: 'User deleted' });
 })
 
 export default authController;
