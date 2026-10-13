@@ -4,14 +4,28 @@ import { trimTrailingSlash } from 'hono/trailing-slash'
 import authController from './controllers/authController'
 import recipeController from './controllers/recipeController'
 import savedRecipeController from './controllers/savedRecipeController'
+import imageController from './controllers/imageController'
 
 type Bindings = {
   FOODIST: D1Database
   IMAGES: R2Bucket
   JWT_SECRET: string
+  PUBLIC_IMAGE_BASE?: string
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+type Variables = {
+  requestId: string
+}
+
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
+
+// Correlates client-visible 500s with `wrangler tail` logs
+app.use('*', async (c, next) => {
+  const requestId = crypto.randomUUID()
+  c.set('requestId', requestId)
+  c.header('X-Request-Id', requestId)
+  await next()
+})
 
 // Remove trailing slashes
 app.use('*', trimTrailingSlash())
@@ -33,9 +47,11 @@ app.use('*', cors({
 
 // Global error handler — do not leak internal exception details to clients
 app.onError((err, c) => {
-  console.error('Error:', err)
+  const requestId = c.get('requestId')
+  console.error(`Error [${requestId}] ${c.req.method} ${c.req.path}:`, err)
   return c.json({
     error: 'Internal Server Error',
+    requestId,
   }, 500)
 })
 
@@ -55,6 +71,7 @@ app.get('/', (c) => {
 app.route('/auth', authController)
 app.route('/recipes', recipeController)
 app.route('/saved-recipes', savedRecipeController)
+app.route('/images', imageController)
 
 // 404 handler
 app.notFound((c) => {
@@ -68,6 +85,7 @@ app.notFound((c) => {
       'GET /recipes',
       'GET /recipes/:id',
       'POST /recipes',
+      'GET /images/:folder/:file',
     ]
   }, 404)
 })
