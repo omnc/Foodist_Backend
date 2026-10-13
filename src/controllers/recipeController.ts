@@ -4,6 +4,7 @@ import { deleteImages, uploadImage } from "../lib/imageUpload";
 import { imageBaseFor, imageKeyFromStored, resolveImageUrl, validateImageFile } from "../lib/images";
 import { parseId, readFormData, readJsonObject } from "../lib/http";
 import { deleteRecipeCascade } from "../lib/recipeDelete";
+import { ratingSummary, recipeCardInclude, toRecipeCard, withImageUrls } from "../lib/recipeSummary";
 import prismaClients from "../lib/prismaClient";
 import { isValidMealType, VALID_MEAL_TYPES, type MealType } from "../lib/mealTypes";
 import { getAuthUserId, type AuthUser } from "../lib/authz";
@@ -71,16 +72,7 @@ function parseDescriptionBlocks(raw: unknown): Array<{ content?: string; descrip
     }
 }
 
-function withImageUrls<T extends { titleImage?: string | null }>(recipe: T, base: string) {
-    const titleImage = resolveImageUrl(recipe.titleImage, base);
-    return { ...recipe, titleImage, titleImageUrl: titleImage };
-}
-
 function serializeRecipe(recipe: any, base: string) {
-    const averageRating = recipe.comments?.length > 0
-        ? recipe.comments.reduce((sum: number, comment: { rating: number }) => sum + comment.rating, 0) / recipe.comments.length
-        : null;
-
     return {
         ...withImageUrls(recipe, base),
         descriptionBlocks: recipe.descriptionBlocks?.map((block: { imageUrl?: string | null }) => ({
@@ -88,8 +80,7 @@ function serializeRecipe(recipe: any, base: string) {
             imageUrl: resolveImageUrl(block.imageUrl, base),
         })) ?? [],
         authorName: recipe.user?.username || recipe.user?.email || null,
-        averageRating: averageRating === null ? null : Math.round(averageRating * 10) / 10,
-        totalComments: recipe.comments?.length ?? 0,
+        ...ratingSummary(recipe.comments),
         ingredients: recipe.ingredientBlock?.items?.map((item: { value: string; measurement: string; id: number }) => ({
             id: item.id,
             name: item.value,
@@ -109,21 +100,11 @@ recipeController.get('/', async (c) => {
     const recipes = await prisma.recipe.findMany({
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-            user: { select: { id: true, email: true, username: true } },
-            comments: { select: { rating: true } },
-        }
+        include: recipeCardInclude,
     });
 
     const base = imageBaseFor(c.req.url, c.env.PUBLIC_IMAGE_BASE);
-    return c.json(recipes.map((recipe) => ({
-        ...withImageUrls(recipe, base),
-        authorName: recipe.user?.username || recipe.user?.email || null,
-        averageRating: recipe.comments.length > 0
-            ? Math.round((recipe.comments.reduce((s, c) => s + c.rating, 0) / recipe.comments.length) * 10) / 10
-            : null,
-        totalComments: recipe.comments.length,
-    })));
+    return c.json(recipes.map((recipe) => toRecipeCard(recipe, base)));
 })
 
 //search for recipes — must be registered before /:id
@@ -153,21 +134,29 @@ recipeController.get('/search', async (c) => {
         },
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-            user: { select: { id: true, email: true, username: true } },
-            comments: { select: { rating: true } },
-        }
+        include: recipeCardInclude,
     });
 
     const base = imageBaseFor(c.req.url, c.env.PUBLIC_IMAGE_BASE);
-    return c.json(recipes.map((recipe) => ({
-        ...withImageUrls(recipe, base),
-        authorName: recipe.user?.username || recipe.user?.email || null,
-        averageRating: recipe.comments.length > 0
-            ? Math.round((recipe.comments.reduce((s, c) => s + c.rating, 0) / recipe.comments.length) * 10) / 10
-            : null,
-        totalComments: recipe.comments.length,
-    })));
+    return c.json(recipes.map((recipe) => toRecipeCard(recipe, base)));
+})
+
+//get the authenticated user's own recipes — must be registered before /:id
+recipeController.get('/mine', authMiddleware, async (c) => {
+    const userId = getAuthUserId(c.get('user'));
+    if (!userId) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const prisma = await prismaClients.fetch(c.env.FOODIST);
+    const recipes = await prisma.recipe.findMany({
+        where: { userID: userId },
+        orderBy: { createdAt: 'desc' },
+        include: recipeCardInclude,
+    });
+
+    const base = imageBaseFor(c.req.url, c.env.PUBLIC_IMAGE_BASE);
+    return c.json(recipes.map((recipe) => toRecipeCard(recipe, base)));
 })
 
 //get a recipe by id with comments, ingredients, directions, and average rating
@@ -208,11 +197,8 @@ recipeController.post('/:id/comments', authMiddleware, async (c) => {
     const body = typeof bodyJson.body === 'string' ? bodyJson.body.trim() : '';
     const rating = Number(bodyJson.rating);
 
-    if (!body) {
-        return c.json({ error: 'Comment body is required' }, 400);
-    }
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-        return c.json({ error: 'Rating must be an integer between 1 and 5' }, 400);
+        return c.json({ error: 'A rating between 1 and 5 is required' }, 400);
     }
 
     const recipe = await prisma.recipe.findUnique({ where: { id: recipeID } });
@@ -257,11 +243,8 @@ recipeController.put('/comments/:id', authMiddleware, async (c) => {
     const body = typeof bodyJson.body === 'string' ? bodyJson.body.trim() : '';
     const rating = Number(bodyJson.rating);
 
-    if (!body) {
-        return c.json({ error: 'Comment body is required' }, 400);
-    }
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-        return c.json({ error: 'Rating must be an integer between 1 and 5' }, 400);
+        return c.json({ error: 'A rating between 1 and 5 is required' }, 400);
     }
 
     const comment = await prisma.comment.findUnique({
