@@ -64,6 +64,10 @@ model IngredientBlockItem {
   id Int @id @default(autoincrement())
   value String
   measurement String
+  // Ingredient group (post-page "heading"); groups are ordered by groupIndex, items by position
+  heading String?
+  groupIndex Int @default(0)
+  position Int @default(0)
   ingredientBlock IngredientBlock @relation(fields: [ingredientBlockID], references: [id])
   ingredientBlockID Int
 }
@@ -87,6 +91,8 @@ model Recipe {
   savedBy           SavedRecipe[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+
+  @@index([userID])
 }
 
 model DescriptionBlock {

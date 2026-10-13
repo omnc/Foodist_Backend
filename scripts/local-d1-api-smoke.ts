@@ -206,6 +206,41 @@ try {
     if (card?.averageRating !== 4) throw new Error('list card rating mismatch')
   })
 
+  await step('ingredient groups persist with headings in submitted order', async () => {
+    const form = new FormData()
+    form.set('title', 'Local D1 Lasagne')
+    form.set('description', 'Grouped ingredients')
+    form.set('mealtype', 'DINNER')
+    form.set(
+      'ingredientGroups',
+      JSON.stringify([
+        { heading: 'For the sauce', items: [{ name: 'Tomato', amount: '2', unit: 'cups' }, { name: 'Basil', amount: '1', unit: 'bunch' }] },
+        { heading: 'For the pasta', items: [{ name: 'Lasagne sheets', amount: '12', unit: 'pcs' }] },
+      ])
+    )
+    const { contentType, body } = await multipart(form)
+    const res = await req('/recipes', { method: 'POST', headers: { ...auth(), 'Content-Type': contentType }, body })
+    if (res.status !== 201) throw new Error(`status ${res.status} ${await res.text()}`)
+    const { id } = (await res.json()) as { id: number }
+    const fetched = (await (await req(`/recipes/${id}`)).json()) as {
+      ingredientGroups: Array<{ heading: string | null; items: Array<{ name: string }> }>
+      ingredients: unknown[]
+    }
+    const shape = fetched.ingredientGroups.map((g) => [g.heading, g.items.map((i) => i.name)])
+    const expected = [['For the sauce', ['Tomato', 'Basil']], ['For the pasta', ['Lasagne sheets']]]
+    if (JSON.stringify(shape) !== JSON.stringify(expected)) throw new Error(`groups ${JSON.stringify(shape)}`)
+    if (fetched.ingredients.length !== 3) throw new Error('flat ingredients alias missing')
+
+    const blank = new FormData()
+    blank.set('title', 'Bad groups')
+    blank.set('description', 'x')
+    blank.set('mealtype', 'DINNER')
+    blank.set('ingredientGroups', JSON.stringify([{ heading: ' ', items: [{ name: 'Salt' }] }]))
+    const bad = await multipart(blank)
+    const rejected = await req('/recipes', { method: 'POST', headers: { ...auth(), 'Content-Type': bad.contentType }, body: bad.body })
+    if (rejected.status !== 400) throw new Error(`blank heading: ${rejected.status}`)
+  })
+
   let imageRecipeId = 0
   let titleImagePath = ''
   await step('create recipe with images; images are served by the worker', async () => {
