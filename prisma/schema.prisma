@@ -5,16 +5,15 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  // Prisma 6.19 + @prisma/adapter-d1@6.19 (pinned together).
-  // driverAdapters preview flag is deprecated in 6.19 and unnecessary.
-  // Prisma 7 upgrade deferred: requires generator/runtime changes and has
-  // known D1 savepoint gaps — see README.
-  provider = "prisma-client-js"
+  // Prisma 7 + Cloudflare Workers / D1
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "cloudflare"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  // URL configured in prisma.config.ts for CLI; Workers use PrismaD1 adapter.
 }
 
 enum MealTypes {
