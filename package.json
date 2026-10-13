@@ -12,18 +12,18 @@
     "test:watch": "vitest",
     "dev:local": "wrangler dev -c wrangler.local.jsonc",
     "db:local:migrate": "wrangler d1 migrations apply FOODIST_LOCAL --local -c wrangler.local.jsonc",
-    "test:local-d1": "npm run db:local:migrate && tsx scripts/local-d1-api-smoke.ts"
+    "test:local-d1": "npm run build && npm run db:local:migrate && tsx scripts/local-d1-api-smoke.ts"
   },
   "dependencies": {
-    "@prisma/adapter-d1": "6.19.0",
-    "@prisma/client": "6.19.0",
+    "@prisma/adapter-d1": "7.10.0",
+    "@prisma/client": "7.10.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "hono": "^4.10.6"
   },
   "devDependencies": {
     "dotenv": "^17.2.3",
-    "prisma": "6.19.0",
+    "prisma": "7.10.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4",

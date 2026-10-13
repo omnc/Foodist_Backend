@@ -65,15 +65,15 @@ Responses include aliases `titleImageUrl`, `authorName`, `ingredients`, `average
 
 ## Prisma / D1 version alignment
 
-Pinned for compatibility:
+Pinned for compatibility (Prisma 7 draft — see `docs/PRISMA7_MIGRATION.md`):
 
 | Package | Version |
 |---------|---------|
-| `prisma` | `6.19.0` |
-| `@prisma/client` | `6.19.0` |
-| `@prisma/adapter-d1` | `6.19.0` |
+| `prisma` | `7.10.0` |
+| `@prisma/client` | `7.10.0` |
+| `@prisma/adapter-d1` | `7.10.0` |
 
-The previous skew (`adapter-d1` ^7 with Prisma 6) is resolved by **pinning the adapter down to 6.19.0**, matching the installed client/CLI. A jump to Prisma 7 was deferred: it needs generator/`runtime = "cloudflare"` migration and still has D1 transaction/savepoint caveats. Revisit Prisma 7 as a dedicated upgrade with local D1 verification (not production).
+Generator: `prisma-client` with `runtime = "cloudflare"` → `src/generated/prisma` (gitignored; run `npm run build`). CLI datasource URL lives in `prisma.config.ts`.
 
 ## Known limitations
 

@@ -1,23 +1,25 @@
-# Prisma 7 migration spike (deferred)
+# Prisma 7 migration
 
-## Decision (this audit)
+## Status
 
-Remain on **Prisma 6.19.0** + `@prisma/adapter-d1@6.19.0`. Do **not** upgrade to Prisma 7 in this increment.
+Upgrade implemented on branch `cursor/prisma7-upgrade-fde9` as a **draft PR targeting `main`**. Do not merge until owner review.
 
-## Why deferred
+## What changed
 
-1. Prisma 7 changes generator defaults (`runtime = "cloudflare"`, client output path).
-2. D1 still lacks real transactions; Prisma 7 queryCompiler savepoint behavior has known rough edges with D1.
-3. Security and product work are higher priority than a major ORM bump.
+1. Pins `prisma`, `@prisma/client`, and `@prisma/adapter-d1` to **7.10.0**.
+2. Generator uses `provider = "prisma-client"`, `runtime = "cloudflare"`, output `../src/generated/prisma`.
+3. Datasource URL moved to `prisma.config.ts` (Prisma 7 CLI config); Workers still use `PrismaD1` adapter.
+4. Runtime import: `../generated/prisma/client` (generated client; gitignored).
+5. Local D1 smoke runs under `wrangler` `unstable_dev` so Cloudflare WASM loads (Node/`tsx` alone cannot).
 
-## Suggested future spike (owner-approved)
+## Verification (local)
 
-1. Branch from main with local-only `wrangler.local.jsonc`.
-2. Upgrade `prisma` / `@prisma/client` / `@prisma/adapter-d1` together to the same 7.x.
-3. Update `schema.prisma` generator; regenerate client; fix imports.
-4. Run `npm run test:local-d1` + unit tests; no production deploy until green.
-5. Document any upsert/transaction patterns that must be rewritten.
+- `npm test` — 22 unit tests
+- `npx tsc --noEmit`
+- `npm run test:local-d1` — register/login/CSRF deny/create recipe/fetch nested data
 
-## Owner decision needed
+## Caveats
 
-Approve a dedicated Prisma 7 spike PR only after P0 deploy and local D1 suite stay green.
+- D1 still lacks real interactive transactions; nested writes remain sequential.
+- Deploy only after owner review of this PR (no auto-deploy from this work).
+- `prisma.config.ts` falls back to `file:./dev.db` when `DATABASE_URL` is unset so CI/`prisma generate` works without a committed `.env`.
