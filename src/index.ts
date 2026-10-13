@@ -24,7 +24,7 @@ app.use('*', cors({
     'http://localhost:3000',
     'http://localhost:5173',
   ],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   credentials: true,
   exposeHeaders: ['Content-Length', 'X-Request-Id'],

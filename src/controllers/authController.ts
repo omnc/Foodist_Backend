@@ -1,10 +1,20 @@
 import { Hono } from "hono";
+import { deleteCookie, setCookie } from 'hono/cookie';
 import prismaClients from "../lib/prismaClient";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { sign } from 'hono/jwt';
 import bcrypt from 'bcryptjs';
 import { publicUserSelect, toPublicUser } from "../lib/userDto";
 import { getAuthUserId, requireSelf, type AuthUser } from "../lib/authz";
+import {
+  CSRF_COOKIE,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_SEC,
+  clearCookieOptions,
+  createCsrfToken,
+  csrfCookieOptions,
+  sessionCookieOptions,
+} from "../lib/session";
 
 type Bindings = {
   FOODIST: D1Database;
@@ -13,6 +23,7 @@ type Bindings = {
 
 type Variables = {
   user: AuthUser;
+  authVia: 'bearer' | 'cookie';
 }
 
 const authController = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -73,16 +84,30 @@ authController.post('/login', async (c) => {
         {
             id: user.id,
             email: user.email,
-            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
+            exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SEC
         },
         c.env.JWT_SECRET
     );
 
+    const csrfToken = createCsrfToken();
+    setCookie(c, SESSION_COOKIE, token, sessionCookieOptions());
+    setCookie(c, CSRF_COOKIE, csrfToken, csrfCookieOptions());
+
     return c.json({
         message: 'Login successful',
+        // Bearer kept for backward compatibility / non-browser clients
         token,
+        csrfToken,
+        authMode: 'cookie+bearer',
         user: toPublicUser(user as unknown as Record<string, unknown>),
     });
+})
+
+/** Clear HttpOnly session + CSRF cookies (Bearer clients should discard localStorage token). */
+authController.post('/logout', async (c) => {
+    deleteCookie(c, SESSION_COOKIE, clearCookieOptions());
+    deleteCookie(c, CSRF_COOKIE, clearCookieOptions());
+    return c.json({ message: 'Logged out' });
 })
 
 //get current authenticated user - check if signed in

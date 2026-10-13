@@ -26,11 +26,17 @@ npm run dev
 
 | Script | Purpose |
 |--------|---------|
-| `npm run dev` | Wrangler local/dev worker |
+| `npm run dev` | Wrangler (default config may use remote bindings — prefer `dev:local`) |
+| `npm run dev:local` | Wrangler with `wrangler.local.jsonc` (**no production D1/R2**) |
+| `npm run db:local:migrate` | Apply SQL migrations to local D1 |
 | `npm test` | Vitest unit/security regression tests |
+| `npm run test:local-d1` | Local D1 API smoke (register/login/recipe persist) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run build` | `prisma generate` |
 | `npm run deploy` | Deploy worker (owner approval for production) |
+
+Cookie session migration notes: [`docs/SESSION_COOKIE_MIGRATION.md`](docs/SESSION_COOKIE_MIGRATION.md).  
+Prisma 7 spike (deferred): [`docs/PRISMA7_MIGRATION.md`](docs/PRISMA7_MIGRATION.md).
 
 ## Auth security (P0)
 
