@@ -155,6 +155,57 @@ try {
   })
 
   const auth = () => ({ Authorization: `Bearer ${token}` })
+
+  await step('my recipes only lists the caller\'s recipes', async () => {
+    const otherEmail = `local-d1-other-${Date.now()}@example.com`
+    await req('/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: otherEmail, password }),
+    })
+    const login = await req('/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: otherEmail, password }),
+    })
+    const otherToken = ((await login.json()) as { token: string }).token
+    const form = new FormData()
+    form.set('title', 'Other cook recipe')
+    form.set('description', 'Not mine')
+    form.set('mealtype', 'DINNER')
+    const { contentType, body } = await multipart(form)
+    const created = await req('/recipes', {
+      method: 'POST', headers: { Authorization: `Bearer ${otherToken}`, 'Content-Type': contentType }, body,
+    })
+    if (created.status !== 201) throw new Error(`other create: ${created.status}`)
+
+    const mine = await req('/recipes/mine', { headers: auth() })
+    if (mine.status !== 200) throw new Error(`mine: ${mine.status}`)
+    const list = (await mine.json()) as Array<{ id: number; userID: number; title: string }>
+    if (!list.some((r) => r.id === recipeId)) throw new Error('own recipe missing')
+    if (list.some((r) => r.title === 'Other cook recipe')) throw new Error('other user recipe leaked')
+    if ((await req('/recipes/mine')).status !== 401) throw new Error('mine should require auth')
+  })
+
+  await step('comments require a rating, allow blank text, and drive averageRating', async () => {
+    const before = (await (await req(`/recipes/${recipeId}`)).json()) as { averageRating: number | null }
+    if (before.averageRating !== null) throw new Error(`expected no rating, got ${before.averageRating}`)
+
+    const noRating = await req(`/recipes/${recipeId}/comments`, {
+      method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ body: 'Nice' }),
+    })
+    if (noRating.status !== 400) throw new Error(`comment without rating: ${noRating.status}`)
+
+    const blank = await req(`/recipes/${recipeId}/comments`, {
+      method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ body: '', rating: 4 }),
+    })
+    if (blank.status !== 201) throw new Error(`blank comment with rating: ${blank.status} ${await blank.text()}`)
+
+    const after = (await (await req(`/recipes/${recipeId}`)).json()) as { averageRating: number | null; ratingCount: number }
+    if (after.averageRating !== 4 || after.ratingCount !== 1) throw new Error(`unexpected rating ${JSON.stringify(after)}`)
+    const card = ((await (await req('/recipes')).json()) as Array<{ id: number; averageRating: number | null }>)
+      .find((r) => r.id === recipeId)
+    if (card?.averageRating !== 4) throw new Error('list card rating mismatch')
+  })
+
   let imageRecipeId = 0
   let titleImagePath = ''
   await step('create recipe with images; images are served by the worker', async () => {

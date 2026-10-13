@@ -3,7 +3,8 @@ import { authMiddleware } from "../middlewares/authMiddleware";
 import prismaClients from "../lib/prismaClient";
 import { getAuthUserId, type AuthUser } from "../lib/authz";
 import { parseId, readJsonObject } from "../lib/http";
-import { imageBaseFor, resolveImageUrl } from "../lib/images";
+import { imageBaseFor } from "../lib/images";
+import { recipeCardInclude, toRecipeCard } from "../lib/recipeSummary";
 
 type Bindings = {
     FOODIST: D1Database;
@@ -29,22 +30,13 @@ savedRecipeController.get('/', authMiddleware, async (c) => {
     const savedRecipes = await prisma.savedRecipe.findMany({
         where: { userID: userId },
         include: {
-            recipe: {
-                include: {
-                    user: {
-                        select: { id: true, email: true, username: true }
-                    }
-                }
-            }
+            recipe: { include: recipeCardInclude }
         },
         orderBy: { savedAt: 'desc' }
     });
     
     const base = imageBaseFor(c.req.url, c.env.PUBLIC_IMAGE_BASE);
-    return c.json(savedRecipes.map((entry) => {
-        const titleImage = resolveImageUrl(entry.recipe.titleImage, base);
-        return { ...entry, recipe: { ...entry.recipe, titleImage, titleImageUrl: titleImage } };
-    }));
+    return c.json(savedRecipes.map((entry) => ({ ...entry, recipe: toRecipeCard(entry.recipe, base) })));
 })
 
 // Save a recipe

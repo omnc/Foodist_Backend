@@ -62,6 +62,12 @@ Responses include aliases `titleImageUrl`, `authorName`, `ingredients`, `average
 - `GET /images/<folder>/<file>` streams the object from R2 (immutable cache headers, ETag/304). Responses expose absolute URLs built from the request origin, or from the optional `PUBLIC_IMAGE_BASE` var if images later move to an R2 custom domain.
 - Legacy rows that stored `https://pub-5834839887-foodist-images.r2.dev/<key>` (a host that never resolved) are rewritten to the `/images/` route on read; no data migration needed.
 
+## Ratings and my recipes
+
+- Posting a comment requires a `rating` (integer 1–5); the comment `body` may be blank. One comment per user per recipe.
+- `averageRating` is the mean of comment ratings (1 decimal), or `null` when no one has rated yet; `ratingCount`/`totalComments` accompany it on recipe cards (list, search, saved, mine) and detail.
+- `GET /recipes/mine` (auth) returns the caller's recipes as cards, newest first.
+
 ## Deleting recipes
 
 `DELETE /recipes/:id` (owner only) removes the recipe's comments, steps, everyone's saves, its unshared ingredient block, and its R2 images in one D1 batch.
