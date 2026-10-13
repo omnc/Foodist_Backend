@@ -51,10 +51,12 @@ Prisma 7 spike (deferred): [`docs/PRISMA7_MIGRATION.md`](docs/PRISMA7_MIGRATION.
 - Required: `title`, `description`, `mealtype` (`BREAKFAST|LUNCH|DINNER|SIDEDISH|APPETIZER|DESSERT|DRINK|BREAD`)
 - Optional numbers: `servingSize`, `level`, `prepTime`, `cookTime`
 - Optional: `titleImage` (jpeg/png/webp/gif, max 5MB)
-- Optional JSON strings: `ingredients` `[{name,amount,unit}]`, `descriptionBlocks` `[{step,content}]`
+- Optional JSON strings: `ingredientGroups` `[{heading,items:[{name,amount,unit}]}]` (top-to-bottom order; every heading required, non-blank), or legacy flat `ingredients` `[{name,amount,unit}]`; `descriptionBlocks` `[{step,content}]`
 - Optional: `stepImage_0`, `stepImage_1`, …
 
-Responses include aliases `titleImageUrl`, `authorName`, `ingredients`, `averageRating` for frontend compatibility.
+Responses include aliases `titleImageUrl`, `authorName`, `ingredients` (flat), `ingredientGroups` (`[{heading, items}]` in submitted order; legacy recipes have one group with `heading: null`), `averageRating` for frontend compatibility.
+
+Ingredient headings need migration `0005_add_ingredient_groups.sql`. Workers Builds deploys code without running migrations, so until 0005 is applied in a given D1 database the API detects the missing columns (`PRAGMA table_info`) and stores ingredients without headings instead of failing.
 
 ## Images
 

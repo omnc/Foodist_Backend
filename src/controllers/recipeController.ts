@@ -5,6 +5,15 @@ import { imageBaseFor, imageKeyFromStored, resolveImageUrl, validateImageFile } 
 import { parseId, readFormData, readJsonObject } from "../lib/http";
 import { deleteRecipeCascade } from "../lib/recipeDelete";
 import { ratingSummary, recipeCardInclude, toRecipeCard, withImageUrls } from "../lib/recipeSummary";
+import {
+    flattenIngredientGroups,
+    flattenLegacyIngredients,
+    groupIngredientItems,
+    parseIngredientGroups,
+    type IngredientInput,
+    type IngredientRow,
+} from "../lib/ingredientGroups";
+import { hasIngredientGroupColumns } from "../lib/schemaFeatures";
 import prismaClients from "../lib/prismaClient";
 import { isValidMealType, VALID_MEAL_TYPES, type MealType } from "../lib/mealTypes";
 import { getAuthUserId, type AuthUser } from "../lib/authz";
@@ -20,15 +29,7 @@ type Variables = {
     user: AuthUser;
 }
 
-type IngredientInput = {
-    name?: string;
-    value?: string;
-    amount?: string;
-    unit?: string;
-    measurement?: string;
-};
-
-const recipeInclude = {
+const recipeIncludeBase = {
     comments: {
         include: {
             user: {
@@ -43,12 +44,22 @@ const recipeInclude = {
     descriptionBlocks: {
         orderBy: { id: 'asc' as const }
     },
-    ingredientBlock: {
-        include: {
-            items: true
-        }
-    }
 };
+
+const LEGACY_ITEM_SELECT = { id: true, value: true, measurement: true, ingredientBlockID: true } as const;
+
+/** Detail include; before migration 0005 the group columns must not be selected. */
+async function recipeIncludeFor(db: D1Database) {
+    const groupsEnabled = await hasIngredientGroupColumns(db);
+    return {
+        ...recipeIncludeBase,
+        ingredientBlock: {
+            include: {
+                items: groupsEnabled ? true : { select: LEGACY_ITEM_SELECT },
+            },
+        },
+    } as const;
+}
 
 const recipeController = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -81,13 +92,7 @@ function serializeRecipe(recipe: any, base: string) {
         })) ?? [],
         authorName: recipe.user?.username || recipe.user?.email || null,
         ...ratingSummary(recipe.comments),
-        ingredients: recipe.ingredientBlock?.items?.map((item: { value: string; measurement: string; id: number }) => ({
-            id: item.id,
-            name: item.value,
-            amount: item.measurement,
-            value: item.value,
-            measurement: item.measurement,
-        })) ?? [],
+        ...groupIngredientItems(recipe.ingredientBlock?.items ?? []),
     };
 }
 
@@ -169,7 +174,7 @@ recipeController.get('/:id', async (c) => {
 
     const recipe = await prisma.recipe.findUnique({
         where: { id },
-        include: recipeInclude,
+        include: await recipeIncludeFor(c.env.FOODIST),
     });
 
     if (!recipe) {
@@ -348,7 +353,17 @@ recipeController.post('/', authMiddleware, async (c) => {
         return c.json({ error: 'servingSize, level, prepTime, and cookTime must be numbers' }, 400);
     }
 
-    const ingredients = parseIngredients(formData.get('ingredients'));
+    let ingredientRows: IngredientRow[];
+    const ingredientGroupsRaw = formData.get('ingredientGroups');
+    if (typeof ingredientGroupsRaw === 'string' && ingredientGroupsRaw.trim()) {
+        const parsedGroups = parseIngredientGroups(ingredientGroupsRaw);
+        if ('error' in parsedGroups) {
+            return c.json({ error: parsedGroups.error }, 400);
+        }
+        ingredientRows = flattenIngredientGroups(parsedGroups.groups);
+    } else {
+        ingredientRows = flattenLegacyIngredients(parseIngredients(formData.get('ingredients')));
+    }
     const descriptionBlocksInput = parseDescriptionBlocks(formData.get('descriptionBlocks'));
 
     const titleImageFile = formData.get('titleImage');
@@ -390,17 +405,26 @@ recipeController.post('/', authMiddleware, async (c) => {
             });
             ingredientBlockID = newIngredientBlock.id;
 
-            for (const ing of ingredients) {
-                const value = (ing.name || ing.value || '').trim();
-                const measurement = [ing.amount, ing.unit, ing.measurement].filter(Boolean).join(' ').trim() || '';
-                if (!value) continue;
-                await prisma.ingredientBlockItem.create({
-                    data: {
-                        value,
-                        measurement,
-                        ingredientBlockID: ingredientBlockID!,
-                    }
-                });
+            const groupsEnabled = await hasIngredientGroupColumns(c.env.FOODIST);
+            for (const row of ingredientRows) {
+                if (groupsEnabled) {
+                    await prisma.ingredientBlockItem.create({
+                        data: {
+                            value: row.value,
+                            measurement: row.measurement,
+                            heading: row.heading,
+                            groupIndex: row.groupIndex,
+                            position: row.position,
+                            ingredientBlockID: ingredientBlockID!,
+                        },
+                    });
+                } else {
+                    // Prisma references every model column on insert, so bypass it until 0005 is applied.
+                    await c.env.FOODIST
+                        .prepare('INSERT INTO "IngredientBlockItem" ("value", "measurement", "ingredientBlockID") VALUES (?1, ?2, ?3)')
+                        .bind(row.value, row.measurement, ingredientBlockID!)
+                        .run();
+                }
             }
         }
 
@@ -443,7 +467,7 @@ recipeController.post('/', authMiddleware, async (c) => {
 
         const full = await prisma.recipe.findUnique({
             where: { id: recipe.id },
-            include: recipeInclude,
+            include: await recipeIncludeFor(c.env.FOODIST),
         });
 
         return c.json(serializeRecipe(full, imageBaseFor(c.req.url, c.env.PUBLIC_IMAGE_BASE)), 201);
@@ -532,7 +556,7 @@ recipeController.put('/:id', authMiddleware, async (c) => {
                 ...(ingredientBlockID && { ingredientBlockID }),
                 ...(newTitleImageKey && { titleImage: newTitleImageKey }),
             },
-            include: recipeInclude,
+            include: await recipeIncludeFor(c.env.FOODIST),
         });
 
         if (newTitleImageKey) {

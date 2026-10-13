@@ -2,7 +2,7 @@
 -- Created: 2025-11-23
 
 -- CreateTable: Comment
-CREATE TABLE "Comment" (
+CREATE TABLE IF NOT EXISTS "Comment" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "userID" INTEGER NOT NULL,
     "recipeID" INTEGER NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE "Comment" (
 );
 
 -- CreateIndex: Index on recipeID for faster comment queries
-CREATE INDEX "Comment_recipeID_idx" ON "Comment"("recipeID");
+CREATE INDEX IF NOT EXISTS "Comment_recipeID_idx" ON "Comment"("recipeID");
 
 -- CreateIndex: Index on userID for faster user comment queries
-CREATE INDEX "Comment_userID_idx" ON "Comment"("userID");
+CREATE INDEX IF NOT EXISTS "Comment_userID_idx" ON "Comment"("userID");

@@ -2,7 +2,7 @@
 -- Created: 2025-11-28
 
 -- CreateTable: SavedRecipe
-CREATE TABLE "SavedRecipe" (
+CREATE TABLE IF NOT EXISTS "SavedRecipe" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "userID" INTEGER NOT NULL,
     "recipeID" INTEGER NOT NULL,
@@ -13,5 +13,5 @@ CREATE TABLE "SavedRecipe" (
 );
 
 -- CreateIndex: Prevent duplicate saves (user can't save same recipe twice)
-CREATE UNIQUE INDEX "SavedRecipe_userID_recipeID_key" ON "SavedRecipe"("userID", "recipeID");
+CREATE UNIQUE INDEX IF NOT EXISTS "SavedRecipe_userID_recipeID_key" ON "SavedRecipe"("userID", "recipeID");
 
