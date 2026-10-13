@@ -9,7 +9,10 @@
     "predeploy": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev:local": "wrangler dev -c wrangler.local.jsonc",
+    "db:local:migrate": "wrangler d1 migrations apply FOODIST_LOCAL --local -c wrangler.local.jsonc",
+    "test:local-d1": "npm run db:local:migrate && tsx scripts/local-d1-api-smoke.ts"
   },
   "dependencies": {
     "@prisma/adapter-d1": "6.19.0",
@@ -21,6 +24,7 @@
   "devDependencies": {
     "dotenv": "^17.2.3",
     "prisma": "6.19.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4",
     "wrangler": "^4.4.0"
