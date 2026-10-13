@@ -22,3 +22,4 @@ Upgrade implemented on branch `cursor/prisma7-upgrade-fde9` as a **draft PR targ
 
 - D1 still lacks real interactive transactions; nested writes remain sequential.
 - Deploy only after owner review of this PR (no auto-deploy from this work).
+- `prisma.config.ts` falls back to `file:./dev.db` when `DATABASE_URL` is unset so CI/`prisma generate` works without a committed `.env`.
