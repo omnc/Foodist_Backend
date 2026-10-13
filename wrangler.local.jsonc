@@ -1,0 +1,27 @@
+/**
+ * Local-only Wrangler config for dev/tests.
+ * IMPORTANT: no "remote": true — never points at production D1/R2.
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "foodist-backend-local",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-11-19",
+	"compatibility_flags": ["nodejs_compat"],
+	"d1_databases": [
+		{
+			"binding": "FOODIST",
+			"database_name": "FOODIST_LOCAL",
+			"database_id": "00000000-0000-0000-0000-000000000001"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "IMAGES",
+			"bucket_name": "foodist-images-local"
+		}
+	],
+	"vars": {
+		"JWT_SECRET": "local-dev-only-not-for-production"
+	}
+}
