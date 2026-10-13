@@ -56,6 +56,16 @@ Prisma 7 spike (deferred): [`docs/PRISMA7_MIGRATION.md`](docs/PRISMA7_MIGRATION.
 
 Responses include aliases `titleImageUrl`, `authorName`, `ingredients`, `averageRating` for frontend compatibility.
 
+## Images
+
+- Uploads are stored in the `IMAGES` R2 bucket under `recipes/` or `description-blocks/`; D1 stores the object **key**.
+- `GET /images/<folder>/<file>` streams the object from R2 (immutable cache headers, ETag/304). Responses expose absolute URLs built from the request origin, or from the optional `PUBLIC_IMAGE_BASE` var if images later move to an R2 custom domain.
+- Legacy rows that stored `https://pub-5834839887-foodist-images.r2.dev/<key>` (a host that never resolved) are rewritten to the `/images/` route on read; no data migration needed.
+
+## Deleting recipes
+
+`DELETE /recipes/:id` (owner only) removes the recipe's comments, steps, everyone's saves, its unshared ingredient block, and its R2 images in one D1 batch.
+
 ## Incident / session notes
 
 - Tokens are JWTs stored by the SPA in `localStorage` (XSS-sensitive). Migration to HttpOnly cookies needs a CSRF plan and owner approval.
@@ -78,5 +88,5 @@ Generator: `prisma-client` with `runtime = "cloudflare"` → `src/generated/pris
 ## Known limitations
 
 - Prisma interactive transactions are not relied on with D1; nested recipe writes are sequential with best-effort create.
-- R2 uploads are not rolled back if a later DB write fails (possible orphan objects).
+- R2 uploads are deleted best-effort if a later DB write fails during create/update.
 - Admin/role-based user management is not implemented.

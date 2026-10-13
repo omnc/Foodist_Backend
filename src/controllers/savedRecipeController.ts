@@ -2,10 +2,13 @@ import { Hono } from "hono";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import prismaClients from "../lib/prismaClient";
 import { getAuthUserId, type AuthUser } from "../lib/authz";
+import { parseId, readJsonObject } from "../lib/http";
+import { imageBaseFor, resolveImageUrl } from "../lib/images";
 
 type Bindings = {
     FOODIST: D1Database;
     JWT_SECRET: string;
+    PUBLIC_IMAGE_BASE?: string;
 }
 
 type Variables = {
@@ -37,7 +40,11 @@ savedRecipeController.get('/', authMiddleware, async (c) => {
         orderBy: { savedAt: 'desc' }
     });
     
-    return c.json(savedRecipes);
+    const base = imageBaseFor(c.req.url, c.env.PUBLIC_IMAGE_BASE);
+    return c.json(savedRecipes.map((entry) => {
+        const titleImage = resolveImageUrl(entry.recipe.titleImage, base);
+        return { ...entry, recipe: { ...entry.recipe, titleImage, titleImageUrl: titleImage } };
+    }));
 })
 
 // Save a recipe
@@ -49,8 +56,12 @@ savedRecipeController.post('/:recipeId', authMiddleware, async (c) => {
     }
     
     const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const recipeID = parseInt(c.req.param('recipeId'));
-    const { note } = await c.req.json().catch(() => ({ note: null }));
+    const recipeID = parseId(c.req.param('recipeId'));
+    if (!recipeID) {
+        return c.json({ error: 'Invalid recipe id' }, 400);
+    }
+    const body = await readJsonObject(c.req);
+    const note = typeof body.note === 'string' ? body.note : null;
     
     // Check if recipe exists
     const recipe = await prisma.recipe.findUnique({
@@ -80,9 +91,6 @@ savedRecipeController.post('/:recipeId', authMiddleware, async (c) => {
             recipeID,
             note
         },
-        include: {
-            recipe: true
-        }
     });
     
     return c.json(savedRecipe, 201);
@@ -97,8 +105,12 @@ savedRecipeController.put('/:recipeId', authMiddleware, async (c) => {
     }
     
     const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const recipeID = parseInt(c.req.param('recipeId'));
-    const { note } = await c.req.json();
+    const recipeID = parseId(c.req.param('recipeId'));
+    if (!recipeID) {
+        return c.json({ error: 'Invalid recipe id' }, 400);
+    }
+    const body = await readJsonObject(c.req);
+    const note = typeof body.note === 'string' ? body.note : null;
     
     // Find saved recipe
     const savedRecipe = await prisma.savedRecipe.findFirst({
@@ -130,7 +142,10 @@ savedRecipeController.delete('/:recipeId', authMiddleware, async (c) => {
     }
     
     const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const recipeID = parseInt(c.req.param('recipeId'));
+    const recipeID = parseId(c.req.param('recipeId'));
+    if (!recipeID) {
+        return c.json({ error: 'Invalid recipe id' }, 400);
+    }
     
     // Find saved recipe
     const savedRecipe = await prisma.savedRecipe.findFirst({
@@ -161,7 +176,10 @@ savedRecipeController.get('/check/:recipeId', authMiddleware, async (c) => {
     }
     
     const prisma = await prismaClients.fetch(c.env.FOODIST);
-    const recipeID = parseInt(c.req.param('recipeId'));
+    const recipeID = parseId(c.req.param('recipeId'));
+    if (!recipeID) {
+        return c.json({ error: 'Invalid recipe id' }, 400);
+    }
     
     const savedRecipe = await prisma.savedRecipe.findFirst({
         where: {
