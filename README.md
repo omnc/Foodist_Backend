@@ -57,6 +57,18 @@ Responses include aliases `titleImageUrl`, `authorName`, `ingredients`, `average
 - CORS allowlist: Pages production + local Vite ports (no `*` with credentials).
 - If an older unauthenticated `/auth/change-password` was ever deployed, owners should force password resets / invalidate sessions after deploying this fix. **Confirm deployed worker matches this repo before acting.**
 
+## Prisma / D1 version alignment
+
+Pinned for compatibility:
+
+| Package | Version |
+|---------|---------|
+| `prisma` | `6.19.0` |
+| `@prisma/client` | `6.19.0` |
+| `@prisma/adapter-d1` | `6.19.0` |
+
+The previous skew (`adapter-d1` ^7 with Prisma 6) is resolved by **pinning the adapter down to 6.19.0**, matching the installed client/CLI. A jump to Prisma 7 was deferred: it needs generator/`runtime = "cloudflare"` migration and still has D1 transaction/savepoint caveats. Revisit Prisma 7 as a dedicated upgrade with local D1 verification (not production).
+
 ## Known limitations
 
 - Prisma interactive transactions are not relied on with D1; nested recipe writes are sequential with best-effort create.
